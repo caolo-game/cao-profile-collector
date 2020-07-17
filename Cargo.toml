@@ -16,3 +16,4 @@ log = "0.4"
 serde= { version="1", features=["derive"] }
 sqlx = { version="0.3", features=["postgres", "chrono", "uuid", "tls"] }
 dotenv = { version="0.9", optional=true }
+pretty_env_logger = "0.4"
