@@ -53,29 +53,31 @@ async fn main() -> Result<(), anyhow::Error> {
         .and(warp::filters::body::json())
         .and(db_pool)
         .and_then(|payload: Vec<OwnedRecord>, db: PgPool| async move {
-            let mut tx = db.begin().await.unwrap();
+            tokio::spawn(async move {
+                let mut tx = db.begin().await.unwrap();
 
-            for row in payload {
-                let duration: i64 = row
-                    .duration
-                    .as_nanos()
-                    .try_into()
-                    .expect("Failed to convert duration microseconds to 8 byte value");
-                sqlx::query!(
-                    "
+                for row in payload {
+                    let duration: i64 = row
+                        .duration
+                        .as_nanos()
+                        .try_into()
+                        .expect("Failed to convert duration microseconds to 8 byte value");
+                    sqlx::query!(
+                        "
                     INSERT INTO record (duration_ns, name, file, line)
                     VALUES ($1, $2, $3, $4); ",
-                    duration,
-                    row.name,
-                    row.file,
-                    row.line as i32
-                )
-                .execute(&mut tx)
-                .await
-                .unwrap();
-            }
+                        duration,
+                        row.name,
+                        row.file,
+                        row.line as i32
+                    )
+                    .execute(&mut tx)
+                    .await
+                    .unwrap();
+                }
 
-            tx.commit().await.unwrap();
+                tx.commit().await.unwrap();
+            });
 
             let resp = warp::reply();
             let resp = warp::reply::with_status(resp, warp::http::StatusCode::NO_CONTENT);
