@@ -61,12 +61,14 @@ async fn main() -> Result<(), anyhow::Error> {
                         .duration
                         .as_nanos()
                         .try_into()
-                        .expect("Failed to convert duration microseconds to 8 byte value");
+                        .expect("Failed to convert duration to 8 byte value");
+
+                    let duration: f64 = duration as f64;
+                    let duration = duration / 1000.0;
+
                     sqlx::query!(
-                        "
-                    INSERT INTO record (duration_ns, name, file, line)
-                    VALUES ($1, $2, $3, $4); ",
-                        duration,
+                        "CALL add_to_record($1,$2,$3,$4);",
+                        duration as f32,
                         row.name,
                         row.file,
                         row.line as i32
