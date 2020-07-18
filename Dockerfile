@@ -34,6 +34,7 @@ RUN apt-get update
 RUN apt-get install curl libpq-dev -y
 
 COPY ./migrations/ ./migrations/
+COPY ./release.sh ./release.sh
 COPY --from=build /caolo/bin/ ./
 
 RUN ls -al /caolo

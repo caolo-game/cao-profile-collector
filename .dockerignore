@@ -4,3 +4,4 @@
 !src/
 !migrations/
 !build.sh
+!release.sh
