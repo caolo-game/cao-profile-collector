@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPool;
 use std::convert::Infallible;
@@ -12,6 +13,20 @@ pub struct OwnedRecord {
     pub name: String,
     pub file: String,
     pub line: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RecordModel {
+    pub duration_us_avg: f32,
+    pub duration_us_total: f32,
+    pub duration_us_std_sq: f32,
+    pub num_items: i32,
+
+    pub name: String,
+    pub file: String,
+    pub line: i32,
+    pub created: DateTime<Utc>,
+    pub updated: DateTime<Utc>,
 }
 
 #[tokio::main]
@@ -44,14 +59,32 @@ async fn main() -> Result<(), anyhow::Error> {
             6660
         });
 
-    let db_pool = warp::any().map(move || db_pool.clone());
+    let db_pool = {
+        move || {
+            let db_pool = db_pool.clone();
+            warp::any().map(move || db_pool.clone())
+        }
+    };
 
     let health = warp::get().and(warp::path("health")).map(|| warp::reply());
+
+    let list_records = warp::get()
+        .and(warp::path("records"))
+        .and(db_pool())
+        .and_then(|db: PgPool| async move {
+            let records = sqlx::query_as!(RecordModel, " SELECT * FROM record ")
+                .fetch_all(&db)
+                .await
+                .expect("failed to get records");
+
+            let reply = warp::reply::json(&records);
+            Ok::<_, Infallible>(reply)
+        });
 
     let push_records = warp::post()
         .and(warp::path("push-records"))
         .and(warp::filters::body::json())
-        .and(db_pool)
+        .and(db_pool())
         .and_then(|payload: Vec<OwnedRecord>, db: PgPool| async move {
             tokio::spawn(async move {
                 let mut tx = db.begin().await.unwrap();
@@ -86,7 +119,7 @@ async fn main() -> Result<(), anyhow::Error> {
             Ok::<_, Infallible>(resp)
         });
 
-    let api = health.or(push_records);
+    let api = health.or(push_records).or(list_records);
     let api = api.with(warp::log("cao_profile_collector-router"));
 
     warp::serve(api).run((host, port)).await;
