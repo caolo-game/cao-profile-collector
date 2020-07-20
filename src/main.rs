@@ -83,6 +83,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let push_records = warp::post()
         .and(warp::path("push-records"))
+        // Only accept bodies smaller than 32KiB...
+        .and(warp::body::content_length_limit(1024 * 32))
         .and(warp::filters::body::json())
         .and(db_pool())
         .and_then(|payload: Vec<OwnedRecord>, db: PgPool| async move {
